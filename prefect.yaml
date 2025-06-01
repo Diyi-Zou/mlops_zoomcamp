@@ -25,7 +25,7 @@ deployments:
   tags: []
   concurrency_limit: null
   description: null
-  entrypoint: 3.4/orchestrate_pre_prefect.py:run
+  entrypoint: 03-Orchestration/Prefect/3.4/orchestrate_pre_prefect.py:run
   parameters: {}
   work_pool:
     name: zoompool

@@ -1,16 +1,25 @@
+#!/usr/bin/env python
+# coding: utf-8
+
 import pickle
-import argparse
 from pathlib import Path
+
 import pandas as pd
 import xgboost as xgb
+
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.metrics import root_mean_squared_error
+
 import mlflow
-from prefect import flow, task
+
+mlflow.set_tracking_uri("http://localhost:5000")
+mlflow.set_experiment("nyc-taxi-experiment")
+
+models_folder = Path('models')
+models_folder.mkdir(exist_ok=True)
 
 
 
-@task(retries=3, retry_delay_seconds=2)
 def read_dataframe(year, month):
     url = f'https://d37ci6vzurychx.cloudfront.net/trip-data/green_tripdata_{year}-{month:02d}.parquet'
     df = pd.read_parquet(url)
@@ -27,7 +36,7 @@ def read_dataframe(year, month):
 
     return df
 
-@task
+
 def create_X(df, dv=None):
     categorical = ['PU_DO']
     numerical = ['trip_distance']
@@ -41,10 +50,8 @@ def create_X(df, dv=None):
 
     return X, dv
 
-@task(log_prints=True)
+
 def train_model(X_train, y_train, X_val, y_val, dv):
-    models_folder = Path('models')
-    models_folder.mkdir(exist_ok=True)
     with mlflow.start_run() as run:
         train = xgb.DMatrix(X_train, label=y_train)
         valid = xgb.DMatrix(X_val, label=y_val)
@@ -81,11 +88,8 @@ def train_model(X_train, y_train, X_val, y_val, dv):
 
         return run.info.run_id
 
-@flow
-def run(year:int=2021, month:int=1):
-    mlflow.set_tracking_uri("http://localhost:5000")
-    mlflow.set_experiment("nyc-taxi-experiment")
 
+def run(year, month):
     df_train = read_dataframe(year=year, month=month)
 
     next_year = year if month < 12 else year + 1
@@ -101,8 +105,18 @@ def run(year:int=2021, month:int=1):
 
     run_id = train_model(X_train, y_train, X_val, y_val, dv)
     print(f"MLflow run_id: {run_id}")
-    with open("run_id.txt", "w") as f:
-        f.write(run_id)
     return run_id
 
 
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Train a model to predict taxi trip duration.')
+    parser.add_argument('--year', type=int, required=True, help='Year of the data to train on')
+    parser.add_argument('--month', type=int, required=True, help='Month of the data to train on')
+    args = parser.parse_args()
+
+    run_id = run(year=args.year, month=args.month)
+
+    with open("run_id.txt", "w") as f:
+        f.write(run_id)

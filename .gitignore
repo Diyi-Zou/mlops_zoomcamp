@@ -172,3 +172,9 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# MLflow tracking directories
+mlruns/
+mlartifacts/
+mlflow.db
+models/
